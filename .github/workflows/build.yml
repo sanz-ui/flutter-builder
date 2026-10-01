@@ -26,8 +26,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.32.8'
           channel: 'stable'
           cache: true
+
+      - name: Verify Flutter version
+        run: flutter --version
 
       - name: Extract ZIP
         run: |
@@ -40,14 +44,6 @@ jobs:
           ROOT=$(find project -name "pubspec.yaml" -type f | head -1 | xargs dirname)
           echo "root=$ROOT" >> $GITHUB_OUTPUT
           echo "Flutter root: $ROOT"
-
-      - name: Patch gradle.properties (AGP opt-out)
-        run: |
-          PROPS="${{ steps.find_root.outputs.root }}/android/gradle.properties"
-          if [ ! -f "$PROPS" ]; then touch "$PROPS"; fi
-          echo "android.newDsl=false" >> "$PROPS"
-          echo "=== gradle.properties ==="
-          cat "$PROPS"
 
       - name: Flutter pub get
         working-directory: ${{ steps.find_root.outputs.root }}
