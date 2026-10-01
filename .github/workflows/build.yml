@@ -41,6 +41,14 @@ jobs:
           echo "root=$ROOT" >> $GITHUB_OUTPUT
           echo "Flutter root: $ROOT"
 
+      - name: Patch gradle.properties (AGP opt-out)
+        run: |
+          PROPS="${{ steps.find_root.outputs.root }}/android/gradle.properties"
+          if [ ! -f "$PROPS" ]; then touch "$PROPS"; fi
+          echo "android.newDsl=false" >> "$PROPS"
+          echo "=== gradle.properties ==="
+          cat "$PROPS"
+
       - name: Flutter pub get
         working-directory: ${{ steps.find_root.outputs.root }}
         run: flutter pub get
@@ -61,3 +69,4 @@ jobs:
         with:
           name: flutter-apk
           path: ${{ steps.find_apk.outputs.apk }}
+          
