@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       zip_file:
-        description: 'Nama file ZIP (contoh: BASE HOLLOW EXECUTION.zip)'
+        description: 'Nama file ZIP'
         required: true
         default: 'BASE HOLLOW EXECUTION.zip'
 
@@ -30,9 +30,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Verify Flutter version
-        run: flutter --version
-
       - name: Extract ZIP
         run: |
           mkdir -p project
@@ -45,6 +42,52 @@ jobs:
           echo "root=$ROOT" >> $GITHUB_OUTPUT
           echo "Flutter root: $ROOT"
 
+      # ============================================
+      # PATCH API URL
+      # ============================================
+      - name: Patch API URL
+        run: |
+          ROOT="${{ steps.find_root.outputs.root }}"
+          NEW_URL="http://fizzgntng.surnxuesk.biz.id:2018"
+          echo "=== SEARCHING OLD URLS IN lib/ ==="
+          grep -rn "http://\|https://" $ROOT/lib/ | grep -v "pub.dev\|github.com\|flutter.dev" | head -20 || true
+
+          echo "=== PATCHING ==="
+          find $ROOT/lib -name "*.dart" -type f -exec sed -i \
+            -e "s|http://localhost:[0-9]*|$NEW_URL|g" \
+            -e "s|http://127.0.0.1:[0-9]*|$NEW_URL|g" \
+            -e "s|http://10.0.2.2:[0-9]*|$NEW_URL|g" \
+            -e "s|http://192.168.[0-9]*.[0-9]*:[0-9]*|$NEW_URL|g" \
+            -e "s|https://[a-zA-Z0-9.-]*\.biz\.id:[0-9]*|$NEW_URL|g" \
+            {} \;
+
+          echo "=== AFTER PATCH ==="
+          grep -rn "fizzgntng" $ROOT/lib/ | head -5 || echo "Not found in lib/"
+
+      # ============================================
+      # PATCH ANDROIDMANIFEST (CLEARTEXT)
+      # ============================================
+      - name: Patch AndroidManifest for HTTP
+        run: |
+          ROOT="${{ steps.find_root.outputs.root }}"
+          MANIFEST="$ROOT/android/app/src/main/AndroidManifest.xml"
+          echo "=== BEFORE ==="
+          cat "$MANIFEST" | head -20
+
+          # Tambah usesCleartextTraffic="true" kalau belum ada
+          if ! grep -q "usesCleartextTraffic" "$MANIFEST"; then
+            sed -i 's|<application|<application android:usesCleartextTraffic="true"|' "$MANIFEST"
+            echo "=== ADDED cleartext permission ==="
+          else
+            echo "=== Already has cleartext ==="
+          fi
+
+          echo "=== AFTER ==="
+          grep -A2 "<application" "$MANIFEST" | head -5
+
+      # ============================================
+      # BUILD
+      # ============================================
       - name: Flutter pub get
         working-directory: ${{ steps.find_root.outputs.root }}
         run: flutter pub get
@@ -58,11 +101,9 @@ jobs:
         run: |
           APK=$(find project -name "app-release.apk" -type f | head -1)
           echo "apk=$APK" >> $GITHUB_OUTPUT
-          echo "APK: $APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: flutter-apk
           path: ${{ steps.find_apk.outputs.apk }}
-          
